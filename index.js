@@ -1,5 +1,6 @@
 const path = require('path')
 const axios = require('axios')
+const fs = require('fs')
 
 const injectLinkElement = url => {
   switch (path.extname(url)) {
@@ -19,7 +20,7 @@ const injectInlineElement = (url, data) => {
   }
 }
 
-function HtmlInjectAssetsWebpackPlugin (options) {
+function HtmlInjectAssetsWebpackPlugin (options, { projectPath }) {
   const keys = Object.keys(options)
   const regKeys = {}
 
@@ -40,13 +41,20 @@ function HtmlInjectAssetsWebpackPlugin (options) {
         if (reg.test(html)) {
           const [match] = html.match(reg)
 
-          if (match.indexOf('@inject/inline') < 0) {
+          if (match.indexOf('@inject/link') >= 0) {
             html = html.replace(match, injectLinkElement(value))
           } else {
             try {
-              const { data } = await axios(value)
+              let data = ''
 
-              html = html.replace(match, injectInlineElement(value, data))
+              if (value.indexOf('http') >= 0) {
+                data = (await axios(value)).data
+              } else {
+                value = path.resolve(path.resolve(projectPath, 'src'), value)
+                fs.existsSync(value) && (data = fs.readFileSync(value, 'utf8'))
+              }
+
+              data && (html = html.replace(match, injectInlineElement(value, data)))
             } catch (error) {
               throw error
             }
